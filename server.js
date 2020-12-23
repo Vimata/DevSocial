@@ -15,10 +15,10 @@ app.get('/', (req, res) => res.send('API running'));
 
 //Define routes
 
-app.use('/api/users', require('./routes/api/users'));
-app.use('/api/auth', require('./routes/api/auth'));
-app.use('/api/userprofile', require('./routes/api/userprofile'));
-app.use('/api/posts', require('./routes/api/ clubprofile'));
+app.use('/api/users', require('./routes/api/users/register'));
+app.use('/api/users', require('./routes/api/users/login'));
+app.use('/api/users', require('./routes/api/users/users'));
+app.use('/api/clubs/profile', require('./routes/api/clubs/clubprofile'));
 
 const PORT = process.env.PORT || 5000;
 

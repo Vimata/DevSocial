@@ -1,34 +1,26 @@
 const express = require('express');
 const router = express.Router();
-const auth = require('../../middleware/auth');
-const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const gravatar = require('gravatar');
+const jwt = require('jsonwebtoken');
 const config = require('config');
 const { check, validationResult } = require('express-validator');
-const User = require('../../models/User');
 
-//@route  GET api/auth
-//@desc   Test route
-//@access Public
-
-router.get('/', auth, async (req, res) => {
-  try {
-    const user = await User.findById(req.user.id).select('-password');
-    res.json(user);
-  } catch (err) {
-    res.status(500).send('Server Error');
-  }
-});
+const User = require('../../../models/User');
 
 //@route  POST api/users
-//@desc   Authenticate user
+//@desc   Register user
 //@access Public
 
 router.post(
-  '/',
+  '/register',
   [
+    check('name', 'Name is required').not().isEmpty(),
     check('email', 'Please include valid email').isEmail(),
-    check('password', 'Please is required').exists(),
+    check(
+      'password',
+      'Please enter a password with 6 or more characters'
+    ).isLength({ min: 6 }),
   ],
   async (req, res) => {
     const errors = validationResult(req);
@@ -36,27 +28,40 @@ router.post(
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { email, password } = req.body;
+    const { name, email, password } = req.body;
 
     try {
       //See if user exists
       let user = await User.findOne({ email });
 
-      if (!user) {
+      if (user) {
         return res
           .status(400)
-          .json({ errors: [{ msg: 'Invalid username or password' }] });
+          .json({ errors: [{ msg: 'User already exists' }] });
       }
 
-      //Match password with database password
+      //Get users gravatar
 
-      const isMatch = await bcrypt.compare(password, user.password);
+      const avatar = gravatar.url(email, {
+        s: '200',
+        r: 'pg',
+        d: 'mm',
+      });
 
-      if (!isMatch) {
-        return res
-          .status(400)
-          .json({ errors: [{ msg: 'Invalid username or password' }] });
-      }
+      user = new User({
+        name,
+        email,
+        avatar,
+        password,
+      });
+
+      //Encrypt password
+
+      const salt = await bcrypt.genSalt(10);
+      user.password = await bcrypt.hash(password, salt);
+
+      //Save user
+      await user.save();
 
       //Return jsonwebtoken
 
@@ -69,10 +74,10 @@ router.post(
       jwt.sign(
         payload,
         config.get('jwtSecret'),
-        { expiresIn: '30 days' },
+        { expiresIn: '2 days' },
         (err, token) => {
           if (err) throw err;
-          res.json({ token });
+          //res.json({ token, user });
         }
       );
     } catch (err) {
